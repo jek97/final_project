@@ -8,3 +8,5 @@ Update: improved the plotting part as well as the algorithm itself
 Update: joined the Q-factors and the model in a single data structure, also implemented the prioritized sweeping
 
 Update: functions compacted/optimized
+
+Update: modified the data structure to grow while we explore new state/actions, moreover moved to the dyna-q+
