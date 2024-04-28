@@ -10,11 +10,12 @@ DOWN = 1
 LEFT = 2
 RIGHT = 3
 
+# dyna Q with model and q in a single structure, it also has prioritaized sweeping
 
 class Algorithms():
 
     # init methods
-    def __init__(self, env: DunegeonEnvironment, epsilon, alpha, n_ep, n_sim):
+    def __init__(self, env: DunegeonEnvironment, epsilon, alpha, theta, n_ep, n_sim):
         # initialize the environment parameters
         self.env = env
         self.rows = env.get_num_rows()
@@ -22,6 +23,7 @@ class Algorithms():
         self.states = env.all_states()
         self.epsilon = epsilon
         self.alpha = alpha
+        self.theta = theta
         self.n_episode = n_ep
         self.n_simulations = n_sim
         self.holes = self.env._HOLES
@@ -125,9 +127,39 @@ class Algorithms():
     def q_update(self, model, state, action, new_state, reward):
         idx, a = self.model_ns_access(model, state, action, new_state, reward)
         max_q, mx_q_idx, mx_q_a = self.max_q(model, new_state)
-        model[idx]["Q"] = model[idx]["Q"] + self.alpha * (reward + max_q - model[idx]["Q"])
+        model[idx]["Q"] +=  self.alpha * (reward + max_q - model[idx]["Q"])
 
         return model
+    
+    def p_update(self, model, state, action, new_state, reward):
+        idx, a = self.model_ns_access(model, state, action, new_state, reward)
+        max_q, mx_q_idx, mx_q_a = self.max_q(model, new_state)
+        model[idx]["Q"] +=  self.alpha * (reward + max_q - model[idx]["Q"])
+        p = abs(reward + max_q - model[idx]["Q"])
+
+        return p
+    
+    def pq_update(self, p, pq, state, action):
+        if p >= self.theta:
+            #print("PQ A", pq)
+            # check if it's already in the pq list
+            
+            if not (pq == None):
+                for i in range(len(pq)):
+                    #print("X ", (pq[i][0] == state), "y ", (pq[i][1] == action))
+                    if (pq[i][0] == state and pq[i][1] == action and pq[i][2] > p):
+                        #print("pqp", (pq[i][2] == p))
+                        pq[i][2] = p
+                        #print("PQ L1", pq)
+                        return pq
+            
+            pq.append([state, action, p])
+            
+            pq.sort(reverse = True, key = lambda pq: pq[2])
+            #print("PQ L2", pq)
+        
+        return pq
+
     
     def rand_obs_state(self, model):
         obs_states = []
@@ -172,6 +204,15 @@ class Algorithms():
         reward = pos_outcomes[ns_idx][1]
         
         return new_state, reward
+    
+    def SA_predict(self, model, state):
+        predict = []
+        for i in range(len(model)):
+            for j in range(len(model[i]["new_states"])):
+                if model[i]["new_states"][j][0] == state:
+                    predict.append([model[i]["new_states"][j][1], model[i]["state"], model[i]["action"]])
+        return  predict
+
 
     def model_reset(self, model):
         for i in range(len(model)):
@@ -183,6 +224,8 @@ class Algorithms():
         model = self.model_init()
         t = 0
         cum_rew = 0
+        PQueue = []
+        save = False
         
         for i in range(self.n_episode):
             print("episode: ", i, " steps: ", t, " cum reward: ", cum_rew)
@@ -191,6 +234,8 @@ class Algorithms():
             done = False
             cum_rew = 0
             self.model_reset(model)
+            traj = []
+            if i == (self.n_episode -1): save = True
 
             s = self.env.reset().observation # observe the initial state
             state = [s[0], s[1]]
@@ -198,28 +243,46 @@ class Algorithms():
 
             while not done:
                 t += 1
-                
+                if save == True: traj.append(state)
                 action = self.eps_greedy_action(state, model)
 
                 timestep = self.env.step(action)
                 n_s = timestep.observation # check in which state we land
                 n_state = [n_s[0], n_s[1]]
-
+                
                 reward = timestep.reward
                 cum_rew += reward
-                model = self.q_update(model, state, action, n_state, reward)
+                model= self.q_update(model, state, action, n_state, reward)
                 
                 model = self.model_update(model, state, action, t, reward, n_state)
+
+                p = self.p_update(model, state, action, n_state, reward)
+                
+                PQueue = self.pq_update(p, PQueue, state, action)
                 
                 # speed up patch
                 #for i in range(self.n_simulations):
                 max_sim = min(t, self.n_simulations)
                 for i in range(max_sim):
                     tv += 1
-                    sim_state = self.rand_obs_state(model)
-                    sim_action = self.rand_obs_action(model, sim_state)
+                    
+                    if i < len(PQueue):
+                        sim_state = PQueue[i][0]
+                        sim_action = PQueue[i][1]
+                        del PQueue[i]
+                    else:
+                        sim_state = self.rand_obs_state(model)
+                        sim_action = self.rand_obs_action(model, sim_state)
+                        
                     new_sim_state, sim_reward = self.simulation(model, sim_state, sim_action)
                     model = self.q_update(model, sim_state, sim_action, new_sim_state, sim_reward)
+                    pred = self.SA_predict(model, state)
+                    
+                    for i in range(len(pred)):
+                        r = pred[i][0]
+                        p = self.p_update(model, pred[i][1], pred[i][2], state, r)
+                        PQueue = self.pq_update(p, PQueue, pred[i][1], pred[i][2])
+
                     self.finish_vt
 
                 
@@ -231,7 +294,7 @@ class Algorithms():
                     self.cumm_rew.append(cum_rew)
                     done = True
         
-        return model
+        return model, traj
     
     def max_occ(self, state, model):
         for i in range(len(model)):
@@ -249,7 +312,7 @@ class Algorithms():
         return policy
 
 
-    def plot_arrow_grid(self, policy, title):
+    def plot_arrow_grid(self, policy, traj, title):
         rows = len(policy)
         columns = len(policy[0])
         background = np.ones((rows, columns, 3))
@@ -274,14 +337,20 @@ class Algorithms():
         # Add arrows/portals to the plot
         for i in range(rows):
             for j in range(columns):
+                try:
+                    traj.index([i, j])
+                    color = 'red'
+                except:
+                    color = 'black'
+
                 if grid[i][j] == 0:  # Up arrow
-                    plt.arrow(j, i, 0, -0.2, head_width=0.1, head_length=0.1, fc='black', ec='black')
+                    plt.arrow(j, i, 0, -0.2, head_width=0.1, head_length=0.1, fc=color, ec=color)
                 elif grid[i][j] == 1:  # Down arrow
-                    plt.arrow(j, i, 0, 0.2, head_width=0.1, head_length=0.1, fc='black', ec='black')
+                    plt.arrow(j, i, 0, 0.2, head_width=0.1, head_length=0.1, fc=color, ec=color)
                 elif grid[i][j] == 2:  # Left arrow
-                    plt.arrow(j, i, -0.2, 0, head_width=0.1, head_length=0.1, fc='black', ec='black')
+                    plt.arrow(j, i, -0.2, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
                 elif grid[i][j] == 3:  # Right arrow
-                    plt.arrow(j, i, 0.2, 0, head_width=0.1, head_length=0.1, fc='black', ec='black')
+                    plt.arrow(j, i, 0.2, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
         
         port = list(self.portals.values())
         keys = list(self.portals.keys())
@@ -289,8 +358,8 @@ class Algorithms():
             color = np.random.randint(50, 255, (1, 3))
             color = color / 255
             for j in range(len(port[i])):
-                plt.text(port[i][j][0], port[i][j][1], keys[i], ha='center', va='center')
-                plt.gca().add_patch(Circle((port[i][j]), 0.3, color=color))
+                plt.text(port[i][j][1], port[i][j][0], keys[i], ha='center', va='center')
+                plt.gca().add_patch(Circle((port[i][j][1], port[i][j][0]), 0.3, color=color))
 
         plt.xlim(-0.5, columns-0.5)
         plt.ylim(rows-0.5, -0.5)
@@ -327,11 +396,12 @@ def main():
 
     
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 50, 50)
-    model = solver.dyna_q()
+    solver = Algorithms(env, 0.3, 0.5, 0.01, 200, 5)
+    model, traj = solver.dyna_q()
     policy = solver.policy_eval(model)
     print("policy", policy)
-    solver.plot_arrow_grid(policy, "graph")
+    print(traj)
+    solver.plot_arrow_grid(policy, traj, "graph")
     solver.plot_data()
     
     
@@ -344,14 +414,14 @@ DEBUG:
 
     # model init
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     print("model_0")
     print(model)
 
     # model_ns_access
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     state = model[10]["state"]
     action = model[10]["action"]
@@ -363,7 +433,7 @@ DEBUG:
 
     # max_q
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     state = model[10]["state"]
     model[10]["Q"] = 100
@@ -372,7 +442,7 @@ DEBUG:
 
     # eps_greedy_action: activate the print greedy
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     model[10]["Q"] = 100
     state = model[10]["state"]
@@ -383,7 +453,7 @@ DEBUG:
 
     # model update
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     print("model_b", model[10])
     state = model[10]["state"]
@@ -404,7 +474,7 @@ DEBUG:
 
     # q update
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     print("model_b", model[10])
     state = model[10]["state"]
@@ -416,7 +486,7 @@ DEBUG:
 
     # rand_obs_state
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     print("model_b", model[10])
     state = model[10]["state"]
@@ -431,7 +501,7 @@ DEBUG:
 
     # rand_obs_action
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     print("model_b", model[10])
     state = model[10]["state"]
@@ -446,7 +516,7 @@ DEBUG:
 
     # simulation: uncomment the prints
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     model = solver.model_init()
     print("model_b", model[10])
     state = model[10]["state"]
@@ -470,7 +540,7 @@ DEBUG:
 
     # dyna q: uncomment the prints
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1)
     q = solver.dyna_q()
     policy = solver.policy_eval(q)
     solver.plot_arrow_grid(policy, "graph")
