@@ -2,7 +2,7 @@
 from environment.dungeon import DunegeonEnvironment
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from matplotlib.patches import Circle
 
 # Available actions:
 UP = 0 
@@ -24,6 +24,10 @@ class Algorithms():
         self.alpha = alpha
         self.n_episode = n_ep
         self.n_simulations = n_sim
+        self.holes = self.env._HOLES
+        self.obstacles = self.env._OBSTACLES
+        self.treasure = self.env._TREASURES
+        self.portals = self.env._PORTALS
 
         # additional data
         self.start_state = []
@@ -41,188 +45,89 @@ class Algorithms():
             state = [self.states[i][0], self.states[i][1]]
             actions = self.env.valid_actions(state)
             for j in range(len(actions)):
-                model.append({"state": state, "action": actions[j], "occurence": 0, "time": [], "new_states": []})
+                model.append({"state": state, "action": actions[j],"Q": 0, "occurence": 0, "time": [], "new_states": []})
         
         return model
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    model = solver.model_init()
-    print("model_0")
-    print(model)
-    """
-    
-    def q_init(self):
-        q = []
-        state = []
-        actions = []
-        for i in range(len(self.states)):
-            state = [self.states[i][0], self.states[i][1]]
-            actions = self.env.valid_actions(state)
-            for j in range(len(actions)):
-                q.append({"state": state, "action": actions[j], "Q": 0})
-        
-        return q
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    q = solver.q_init()
-    print("q_0")
-    print(q)
-    """
-
-
-           
     
     # access methods
-    def Q_access(self, q, state, action):
-        for i in range(len(q)):
-            if q[i]["state"] == state and q[i]["action"] == action:
-                return i
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    q = solver.q_init()
-    q[5]["Q"] = 3
-    state = q[5]["state"] 
-    action = q[5]["action"]
-    print("state", state, "action", action)
-    idx = solver.Q_access(q, state, action)
-    print("q(idx)", q[idx])
-    """
-    
-    def model_access(self, model, state, action):
-        for i in range(len(model)):
-            if model[i]["state"] == state and model[i]["action"] == action:
-                return i
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    model = solver.model_init()
-    state = model[10]["state"]
-    action = model[10]["action"]
-    idx = solver.model_access(model, state, action)
-    print("idx", idx)
-    """
-            
     def model_ns_access(self, model, state, action, new_state, reward):
+        x = -1
+        y = -1
         for i in range(len(model)):
             if model[i]["state"] == state and model[i]["action"] == action:
+                x = i
                 for j in range(len(model[i]["new_states"])):
                     if model[i]["new_states"][j][0] == new_state and model[i]["new_states"][j][1] == reward:
-                        return j
-        #print("state/reward combination not found")
-        return -1
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    model = solver.model_init()
-    state = model[10]["state"]
-    action = model[10]["action"]
-    model[10]["new_states"].append([[10, 10], [4], 100])
-    idx = solver.model_ns_access(model, state, action, [10, 10], [4])
-    print("idx", idx)
-    """
+                        y = j
+        return x, y
+    
     
     # utilities
-    def max_q(self, q, state):
-        max_q = 0
+    def max_q(self, model, state):
+        max_q = float('-inf')
         max_q_idx = 0
         max_q_a = 0
-        for i in range(len(q)):
-            if q[i]["state"] == state:
-                if q[i]["Q"] >= max_q:
-                    max_q = q[i]["Q"]
-                    max_q_idx = i
-                    max_q_a = q[i]["action"]
+        for i in range(len(model)):
+            if model[i]["state"] == state and model[i]["Q"] >= max_q:
+                max_q = model[i]["Q"]
+                max_q_idx = i
+                max_q_a = model[i]["action"]
         return max_q, max_q_idx, max_q_a
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    q = solver.q_init()
-    state = q[10]["state"]
-    q[10]["Q"] = 100
-    max_q, max_q_idx, max_q_a = solver.max_q(q, state)
-    print("max_q", max_q, "idx", max_q_idx)
-    """
+
+    def max_q_occ(self, model, state): # ass max_q but it check only among actions taken
+        max_q = float('-inf')
+        max_q_idx = 0
+        max_q_a = 0
+        for i in range(len(model)):
+            if model[i]["state"] == state and model[i]["Q"] > max_q and model[i]["occurence"] > 0:
+
+                max_q = model[i]["Q"]
+                max_q_idx = i
+                max_q_a = model[i]["action"]
+        return max_q, max_q_idx, max_q_a
     
-    def eps_greedy_action(self, state, q): # choose an epsilon-gredy action over the q factors on a given state
+    def eps_greedy_action(self, state, model): # choose an epsilon-gredy action over the q factors on a given state
         local_q = []
         actions = []
         
-        for i in range(len(q)): # first get all the q values associated to the current state
-            if q[i]["state"] == state:
-                local_q.append(q[i]["Q"])
-                actions.append(q[i]["action"])
-        
+        for i in range(len(model)): # first get all the q values associated to the current state
+            if model[i]["state"] == state:
+                local_q.append(model[i]["Q"])
+                actions.append(model[i]["action"])
+    
         max_q = max(local_q)
         idx = local_q.index(max_q)
         
         if np.random.uniform() < self.epsilon: 
+            #print("not greedy")
             del actions[idx]
             act = np.random.choice(actions)
         
         else: # be greedy
+            #print("greedy")
             act = actions[idx]
             
-        
         return act
-    """
-    # main test: activate the print greedy
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    q = solver.q_init()
-    q[10]["Q"] = 100
-    state = q[10]["state"]
-    action = q[10]["action"]
-    print("state", state, "action", action)
-    act = solver.eps_greedy_action(state, q)
-    print("act", act)
-    """
     
     def model_update(self, model, state, action, time, reward, new_state):
-        idx = self.model_access(model, state, action)
-        
+        idx, a = self.model_ns_access(model, state, action, new_state, reward)
+
         model[idx]["occurence"] += 1 # increase the number of times we get in the couple state, action
         model[idx]["time"] = time # update the last time step at which we encountered the state action combination
-        idx_ns = self.model_ns_access(model, state, action, new_state, reward) # check if we have already encountered the new state/reward combination
+        a, idx_ns = self.model_ns_access(model, state, action, new_state, reward) # check if we have already encountered the new state/reward combination
         if idx_ns == -1: # first time we encounter it
             model[idx]["new_states"].append([new_state, reward, 1])
         else: # we've already encountered that new state/reward
             model[idx]["new_states"][idx_ns][2] += 1 # increase the counter of times we've encountered it
         
         return model
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    model = solver.model_init()
-    print("model_b", model[10])
-    state = model[10]["state"]
-    action = model[10]["action"]
-    time = 13
-    reward = 5
-    new_state = [10, 4]
-    solver.model_update(model, state, action, time, reward, new_state)
-    print("model_a new state", model[10])
-    time = 15
-    solver.model_update(model, state, action, time, reward, new_state)
-    print("model_a old state", model[10])
-    """
 
-    def q_update(self, q, state, action, new_state, reward):
-        idx = self.Q_access(q, state, action)
-        max_q, mx_q_idx, mx_q_a = self.max_q(q, new_state)
-        q[idx]["Q"] = q[idx]["Q"] + self.alpha * (reward + max_q - q[idx]["Q"])
+    def q_update(self, model, state, action, new_state, reward):
+        idx, a = self.model_ns_access(model, state, action, new_state, reward)
+        max_q, mx_q_idx, mx_q_a = self.max_q(model, new_state)
+        model[idx]["Q"] = model[idx]["Q"] + self.alpha * (reward + max_q - model[idx]["Q"])
 
-        return q
-
+        return model
     
     def rand_obs_state(self, model):
         obs_states = []
@@ -239,22 +144,6 @@ class Algorithms():
         state_idx = np.random.choice(range(len(obs_states)))
         state = obs_states[state_idx]
         return state
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    model = solver.model_init()
-    print("model_b", model[10])
-    state = model[10]["state"]
-    action = model[10]["action"]
-    time = 13
-    reward = 5
-    new_state = [10, 4]
-    solver.model_update(model, state, action, time, reward, new_state)
-    print("model_a new state", model[10])
-    st = solver.rand_obs_state(model)
-    print("previously obs state", st)
-    """
     
     def rand_obs_action(self, model, state):
         obs_actions = []
@@ -265,22 +154,6 @@ class Algorithms():
         action = np.random.choice(obs_actions)
         return action
     
-    """
-    #main test
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    model = solver.model_init()
-    print("model_b", model[10])
-    state = model[10]["state"]
-    action = model[10]["action"]
-    time = 13
-    reward = 5
-    new_state = [10, 4]
-    solver.model_update(model, state, action, time, reward, new_state)
-    print("model_a new state", model[10])
-    act = solver.rand_obs_action(model, state)
-    print("previously obs action", act)
-    """
 
     def simulation(self, model, state, action):
         pos_outcomes = []
@@ -299,31 +172,6 @@ class Algorithms():
         reward = pos_outcomes[ns_idx][1]
         
         return new_state, reward
-    """
-    #main test: uncomment the prints
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    model = solver.model_init()
-    print("model_b", model[10])
-    state = model[10]["state"]
-    action = model[10]["action"]
-    time = 13
-    reward = 5
-    new_state = [10, 4]
-    solver.model_update(model, state, action, time, reward, new_state)
-    time = 14
-    reward = 2
-    new_state = [10, 4]
-    solver.model_update(model, state, action, time, reward, new_state)
-    time = 15
-    reward = 7
-    new_state = [3, 11]
-    solver.model_update(model, state, action, time, reward, new_state)
-    solver.model_update(model, state, action, time, reward, new_state)
-    print("model_a new state", model[10])
-    n_s, n_r = solver.simulation(model, state, action)
-    print("new state", n_s, "rewward", n_r)
-    """
 
     def model_reset(self, model):
         for i in range(len(model)):
@@ -331,10 +179,13 @@ class Algorithms():
 
     def dyna_q(self):
         # initialization
-        q = self.q_init()
+        time_out = self.rows * self.column
         model = self.model_init()
+        t = 0
+        cum_rew = 0
+        
         for i in range(self.n_episode):
-            print("episode", i)
+            print("episode: ", i, " steps: ", t, " cum reward: ", cum_rew)
             t = 0
             tv = 0
             done = False
@@ -348,59 +199,52 @@ class Algorithms():
             while not done:
                 t += 1
                 
-                action = self.eps_greedy_action(state, q)
-                #print("state", state)
-                #print("action", action)
-                #for i in range(len(q)):
-                    #if q[i]["state"] == state:
-                        #print("actions for state", q[i]["action"])
-                #print("valid_actions env", self.env.valid_actions(state))
-                #print("valid_actions", self.valid_actions(state))
+                action = self.eps_greedy_action(state, model)
 
                 timestep = self.env.step(action)
                 n_s = timestep.observation # check in which state we land
                 n_state = [n_s[0], n_s[1]]
+
                 reward = timestep.reward
                 cum_rew += reward
-
-                q = self.q_update(q, state, action, n_state, reward)
-
+                model = self.q_update(model, state, action, n_state, reward)
+                
                 model = self.model_update(model, state, action, t, reward, n_state)
                 
-                for i in range(self.n_simulations):
+                # speed up patch
+                #for i in range(self.n_simulations):
+                max_sim = min(t, self.n_simulations)
+                for i in range(max_sim):
                     tv += 1
                     sim_state = self.rand_obs_state(model)
                     sim_action = self.rand_obs_action(model, sim_state)
                     new_sim_state, sim_reward = self.simulation(model, sim_state, sim_action)
-                    q = self.q_update(q, sim_state, sim_action, new_sim_state, sim_reward)
+                    model = self.q_update(model, sim_state, sim_action, new_sim_state, sim_reward)
                     self.finish_vt
 
                 
                 state = n_state
 
-                if timestep.is_last(): # if we reached the end of the episode
+                if timestep.is_last() or t >= time_out: # if we reached the end of the episode or the step limit (to prevent loops)
                     self.finish_rt .append(t)
                     self.finish_vt.append(tv)
                     self.cumm_rew.append(cum_rew)
                     done = True
         
-        return q
+        return model
     
-    """
-    #main test: uncomment the prints
-    env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 1, 1)
-    q = solver.dyna_q()
-    policy = solver.policy_eval(q)
-    solver.plot_arrow_grid(policy, "graph")
-    """
+    def max_occ(self, state, model):
+        for i in range(len(model)):
+            if model[i]["state"] == state and model[i]["occurence"] > 0:
+                return True
 
 
-    def policy_eval(self, q):
+    def policy_eval(self, model):
         policy = np.ones((self.rows, self.column)) * 5
         for i in range(len(self.states)):
-            mx_q, mx_q_idx, mx_q_a = self.max_q(q, [self.states[i][0], self.states[i][0]])
-            policy[self.states[i][0]][self.states[i][1]] = mx_q_a
+            if self.max_occ([self.states[i][0], self.states[i][1]], model):
+                mx_q, mx_q_idx, mx_q_a = self.max_q_occ(model, [self.states[i][0], self.states[i][1]])
+                policy[self.states[i][0]][self.states[i][1]] = mx_q_a
         
         return policy
 
@@ -410,22 +254,24 @@ class Algorithms():
         columns = len(policy[0])
         background = np.ones((rows, columns, 3))
         grid = policy
+        
+        for i in range(len(self.obstacles)):
+            background[self.obstacles[i][0]][self.obstacles[i][1]] = [0.5, 0.5, 0.5] # gray
+            
+        for i in range(len(self.treasure)):
+            background[self.treasure[i][0]][self.treasure[i][1]] = [1, 1, 0] # yellow
 
-        for i in range(rows):
-            for j in range(columns):
-                if policy[i][j] == 5:
-                    background[i][j] = 0.5
-                if [i, j] == self.start_state:
-                    background[i][j] = 0.8  
-                if [i, j] == self.goal_state:
-                    background[i][j] = 0.2
+        for i in range(len(self.holes)):
+            background[self.holes[i][0]][self.holes[i][1]] = [0, 0, 0] # black
+        
+        background[int(self.start_state[0])][int(self.start_state[1])] = [1, 0, 1] # pink
     
         # Create the plot
         fig = plt.figure(figsize=(columns, rows))
         plt.imshow(background, cmap=None, interpolation=None)
         fig.set_facecolor("white")
 
-        # Add arrows to the plot
+        # Add arrows/portals to the plot
         for i in range(rows):
             for j in range(columns):
                 if grid[i][j] == 0:  # Up arrow
@@ -436,7 +282,15 @@ class Algorithms():
                     plt.arrow(j, i, -0.2, 0, head_width=0.1, head_length=0.1, fc='black', ec='black')
                 elif grid[i][j] == 3:  # Right arrow
                     plt.arrow(j, i, 0.2, 0, head_width=0.1, head_length=0.1, fc='black', ec='black')
-                
+        
+        port = list(self.portals.values())
+        keys = list(self.portals.keys())
+        for i in range(len(port)):
+            color = np.random.randint(50, 255, (1, 3))
+            color = color / 255
+            for j in range(len(port[i])):
+                plt.text(port[i][j][0], port[i][j][1], keys[i], ha='center', va='center')
+                plt.gca().add_patch(Circle((port[i][j]), 0.3, color=color))
 
         plt.xlim(-0.5, columns-0.5)
         plt.ylim(rows-0.5, -0.5)
@@ -470,16 +324,155 @@ class Algorithms():
 
 
 def main():
+
     
-    #main test: uncomment the prints
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.1, 0.5, 2000, 8)
-    q = solver.dyna_q()
-    policy = solver.policy_eval(q)
+    solver = Algorithms(env, 0.3, 0.5, 50, 50)
+    model = solver.dyna_q()
+    policy = solver.policy_eval(model)
     print("policy", policy)
     solver.plot_arrow_grid(policy, "graph")
     solver.plot_data()
     
     
+    
 if __name__ == "__main__":
     main()
+
+"""
+DEBUG:
+
+    # model init
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    print("model_0")
+    print(model)
+
+    # model_ns_access
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    state = model[10]["state"]
+    action = model[10]["action"]
+    model[10]["new_states"].append([[10, 10], [4], 100])
+    model[10]["new_states"].append([[10, 13], [2], 10])
+    idx, idx2 = solver.model_ns_access(model, state, action, [10, 13], [2])
+    print("idx", idx, idx2)
+    print("model 10", model[idx])
+
+    # max_q
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    state = model[10]["state"]
+    model[10]["Q"] = 100
+    max_q, max_q_idx, max_q_a = solver.max_q(model, state)
+    print("max_q", max_q, "idx", max_q_idx)
+
+    # eps_greedy_action: activate the print greedy
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    model[10]["Q"] = 100
+    state = model[10]["state"]
+    action = model[10]["action"]
+    print("state", state, "action", action)
+    act = solver.eps_greedy_action(state, model)
+    print("act", act)
+
+    # model update
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    print("model_b", model[10])
+    state = model[10]["state"]
+    action = model[10]["action"]
+    time = 13
+    reward = 5
+    new_state = [10, 4]
+    solver.model_update(model, state, action, time, reward, new_state)
+    print("model_a new state", model[10])
+    time = 15
+    solver.model_update(model, state, action, time, reward, new_state)
+    print("model_a same state", model[10])
+    new_state = [5, 10]
+    reward = 3
+    time = 20
+    solver.model_update(model, state, action, time, reward, new_state)
+    print("model_a different state", model[10])
+
+    # q update
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    print("model_b", model[10])
+    state = model[10]["state"]
+    action = model[10]["action"]
+    reward = 5
+    new_state = [10, 4]
+    solver.q_update(model, state, action, new_state, reward)
+    print("model_a", model[10])
+
+    # rand_obs_state
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    print("model_b", model[10])
+    state = model[10]["state"]
+    action = model[10]["action"]
+    time = 13
+    reward = 5
+    new_state = [10, 4]
+    solver.model_update(model, state, action, time, reward, new_state)
+    print("model_a new state", model[10])
+    st = solver.rand_obs_state(model)
+    print("previously obs state", st)
+
+    # rand_obs_action
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    print("model_b", model[10])
+    state = model[10]["state"]
+    action = model[10]["action"]
+    time = 13
+    reward = 5
+    new_state = [10, 4]
+    solver.model_update(model, state, action, time, reward, new_state)
+    print("model_a new state", model[10])
+    act = solver.rand_obs_action(model, state)
+    print("previously obs action", act)
+
+    # simulation: uncomment the prints
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    model = solver.model_init()
+    print("model_b", model[10])
+    state = model[10]["state"]
+    action = model[10]["action"]
+    time = 13
+    reward = 5
+    new_state = [10, 4]
+    solver.model_update(model, state, action, time, reward, new_state)
+    time = 14
+    reward = 2
+    new_state = [10, 4]
+    solver.model_update(model, state, action, time, reward, new_state)
+    time = 15
+    reward = 7
+    new_state = [3, 11]
+    solver.model_update(model, state, action, time, reward, new_state)
+    solver.model_update(model, state, action, time, reward, new_state)
+    print("model_a new state", model[10])
+    n_s, n_r = solver.simulation(model, state, action)
+    print("new state", n_s, "rewward", n_r)
+
+    # dyna q: uncomment the prints
+    env = DunegeonEnvironment()
+    solver = Algorithms(env, 0.3, 0.5, 1, 1)
+    q = solver.dyna_q()
+    policy = solver.policy_eval(q)
+    solver.plot_arrow_grid(policy, "graph")
+    
+"""
