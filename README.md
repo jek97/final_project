@@ -6,3 +6,5 @@ Update: used the professor valid action method.
 Update: improved the plotting part as well as the algorithm itself
 
 Update: joined the Q-factors and the model in a single data structure, also implemented the prioritized sweeping
+
+Update: functions compacted/optimized
