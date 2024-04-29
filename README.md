@@ -10,3 +10,5 @@ Update: joined the Q-factors and the model in a single data structure, also impl
 Update: functions compacted/optimized
 
 Update: modified the data structure to grow while we explore new state/actions, moreover moved to the dyna-q+
+
+Update: found an error, i was modifing the model even in simulation, instead of updating the Q

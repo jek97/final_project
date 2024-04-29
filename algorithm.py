@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
+
 # Available actions:
 UP = 0 
 DOWN = 1
@@ -133,7 +134,7 @@ class Algorithms():
             max_q = self.max_q(new_state)
             self.model[idx]["Q"] +=  self.alpha * (reward + max_q - self.model[idx]["Q"])
         
-        if (flag == 1) or (flag == 2): # only model update (flag = 1) or both
+        if (flag == 1) or (flag == 2): # only model update (flag = 1) or both (flag == 2)
             self.model[idx]["occurence"] += 1 # increase the number of times we get in the couple state, action
             if (time != None):
                 self.model[idx]["time"] = time # update the last time step at which we encountered the state action combination
@@ -290,7 +291,7 @@ class Algorithms():
                         
                     new_sim_state, sim_reward = self.simulation(sim_state, sim_action, t)
                     
-                    self.model_update(sim_state, sim_action, None, sim_reward, new_sim_state, 1)
+                    self.model_update(sim_state, sim_action, None, sim_reward, new_sim_state, 0)
                     
                     pred = self.SA_predict(state)
                     
@@ -422,7 +423,7 @@ def main():
 
     print("check time steps in the sampling at episode's end")
     env = DunegeonEnvironment()
-    solver = Algorithms(env, 0.3, 0.5, 0.01, 100, 5, 0.2)
+    solver = Algorithms(env, 0.3, 0.5, 0.01, 10, 5, 0.2)
     traj = solver.dyna_q()
     policy = solver.policy_eval()
     print("model", solver.model)
