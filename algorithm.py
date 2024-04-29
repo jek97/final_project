@@ -11,7 +11,7 @@ DOWN = 1
 LEFT = 2
 RIGHT = 3
 
-# dyna Q with model and q in a single structure, it also has prioritaized sweeping, let's try to make it stop when Q is stable and see what happend, let's try to create the model while we encounter it, add the dynamic thing of the environment
+# dyna Q with model and q in a single structure, it also has prioritaized sweeping, let's try to make it stop when Q is stable and see what happend, let's try to create the model while we encounter it, add the dynamic thing of the environment, improve the dictionsary
 
 class Algorithms():
 
