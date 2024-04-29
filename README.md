@@ -12,3 +12,7 @@ Update: functions compacted/optimized
 Update: modified the data structure to grow while we explore new state/actions, moreover moved to the dyna-q+
 
 Update: found an error, i was modifing the model even in simulation, instead of updating the Q
+
+Update: tring to modify the model in a single dict, check functions and order of the arguments, it may be wrong sometimes.
+
+

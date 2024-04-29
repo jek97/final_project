@@ -3,6 +3,7 @@ from environment.dungeon import DunegeonEnvironment
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+from collections import defaultdict
 
 
 # Available actions:
@@ -30,7 +31,7 @@ class Algorithms():
         self.n_episode = n_ep
         self.n_simulations = n_sim
         self.sim_k = sim_k
-        self.model = []
+        self.model = defaultdict(lambda: (0, 0, 0, []))
 
         # plotting informations:
         self.holes = env._HOLES
@@ -45,15 +46,6 @@ class Algorithms():
         self.cumm_rew = []
         
 
-    def model_init(self):
-        actions = []
-        for state in self.states:
-            actions = self.env.valid_actions(state)
-            for action in actions:
-                self.model.append({"state": state, "action": action,"Q": 0, "occurence": 0, "time": [], "new_states": []})
-        
-        return
-    
     # access methods
     def model_access(self, state, action, new_state, reward, flag):
         for i in range(len(self.model)):
@@ -71,12 +63,9 @@ class Algorithms():
     # utilities
     def max_q(self, state):
         max_q = float('-inf')
-
-        for m in self.model: # if i already know some Q consider them for the max
-            if (m["state"] == state) and (m["Q"] >= max_q):
-                max_q = m["Q"]
-
-        if (max_q == float('-inf')): max_q = 0 # if i don't know none of them, init to 0
+        
+        Q_list = [self.model[state, a][2] for a in self.env.valid_actions(state)]
+        max_q = max(Q_list)
 
         return max_q
 
@@ -92,22 +81,9 @@ class Algorithms():
         actions = []
 
         actions = self.env.valid_actions(state)
-        for i in range(len(actions)):
-            #print("act", act)
-            idx = self.model_access(state, actions[i], 0, 0, 0)
-            if (idx == -1): # there isnt the state action couple
-                local_q.append(0)
-                actions.append(actions[i])
-            else:
-                local_q.append(self.model[idx]["Q"])
-                actions.append(self.model[idx]["action"])
-
-        """
-        for m in self.model: # first get all the q values associated to the current state
-            if m["state"] == state:
-                local_q.append(m["Q"])
-                actions.append(m["action"])
-        """       
+        for act in actions:
+            local_q.append(self.model[state, act][2])
+            actions.append(act)
     
         max_q = max(local_q)
         idx = local_q.index(max_q)
@@ -125,32 +101,29 @@ class Algorithms():
         return act
     
     def model_update(self, state, action, time, reward, new_state, flag):
-        idx = self.model_access(state, action, 0, 0, 0)
-        if (idx == -1):
-            self.model.append({"state": state, "action": action,"Q": 0, "occurence": 0, "time": time, "new_states": []})
-            idx = len(self.model) - 1
-
+        done = False
         if (flag == 0) or (flag == 2): # only q update (flag = 0) or both model and q update (flag = 2)
             max_q = self.max_q(new_state)
-            self.model[idx]["Q"] +=  self.alpha * (reward + max_q - self.model[idx]["Q"])
-        
-        if (flag == 1) or (flag == 2): # only model update (flag = 1) or both (flag == 2)
-            self.model[idx]["occurence"] += 1 # increase the number of times we get in the couple state, action
-            if (time != None):
-                self.model[idx]["time"] = time # update the last time step at which we encountered the state action combination
+            self.model[state, action][2] +=  self.alpha * (reward + max_q - self.model[state, action][2])
 
-            idx_ns = self.model_access(state, action, new_state, reward, 1) # check if we have already encountered the new state/reward combination
-            if (idx_ns == -1): # first time we encounter it
-                self.model[idx]["new_states"].append([new_state, reward, 1])
-            else: # we've already encountered that new state/reward
-                self.model[idx]["new_states"][idx_ns][2] += 1 # increase the counter of times we've encountered it
+        if (flag == 1) or (flag == 2): # only model update (flag = 1) or both (flag == 2)
+            self.model[state, action][0] += 1 # increase the number of times we get in the couple state, action
+            if (time != None):
+                self.model[state, action][1] = time # update the last time step at which we encountered the state action combination
+            
+            for ns in self.model[state, action][3]:
+                if (ns[0] == new_state) and (ns[1] == reward):
+                    ns[2] += 1
+                    done = True
+                    
+            if done == False:
+                self.model[state, action][3].append([new_state, reward, 1])
         
         return
     
     def pq_update(self, pq, state, action, new_state, reward):
-        idx = self.model_access(state, action, new_state, reward, 0)
         max_q = self.max_q(new_state)
-        p = abs(reward + max_q - self.model[idx]["Q"])
+        p = abs(reward + max_q - self.model[state, action][2])
 
         if (p >= self.theta):
             #print("PQ A", pq)
@@ -200,20 +173,9 @@ class Algorithms():
     
 
     def simulation(self, state, action, t):
-        pos_outcomes = []
-        pos_probabilities = []
-        sa_time = []
-        for m in self.model:
-            if (m["state"] == state) and (m["action"] == action):
-                #print("state", state, "action", action)
-                #print("model", m)
-                #print("model_time", m["time"])
-                sa_time = t - m["time"]
-                #print("sa_time", sa_time)
-                for ns in m["new_states"]:
-                    pos_outcomes.append([ns[0], ns[1]]) # appending the new state/reward couple to the list
-                    pos_probabilities.append((ns[2] / m["occurence"])) # appending the probability for each new state/reward couple
-
+        sa_time = t - self.model[state, action][1]
+        pos_outcomes = [self.model[state, action][3][i][0] for i in range(len(self.model[state, action][3][i]))]
+        pos_probabilities = [self.model[state, action][3][i][2] / self.model[state, action][0] for i in range(len(self.model[state, action][3][i]))]
         
         choices = range(len(pos_probabilities))
         ns_idx = np.random.choice(choices, p = pos_probabilities)
@@ -240,7 +202,6 @@ class Algorithms():
     def dyna_q(self):
         # initialization
         time_out = self.rows * self.column
-        #self.model_init()
         t = 0
         cum_rew = 0
         PQueue = []
@@ -262,7 +223,7 @@ class Algorithms():
             while not done:
                 t += 1
                 
-                action = self.eps_greedy_action(state)
+                action = self.eps_greedy_action(state) # V
                 
                 if (save == True): traj.append([state, action])
                 #if save == True: traj.append(state)
@@ -287,11 +248,12 @@ class Algorithms():
                         sim_action = PQueue[i][1]
                         del PQueue[i]
                     else:
-                        sim_state, sim_action = self.rand_obs_state_action()
+                        sim_state, sim_action = np.random.sample(self.model.keys())
+
                         
                     new_sim_state, sim_reward = self.simulation(sim_state, sim_action, t)
                     
-                    self.model_update(sim_state, sim_action, None, sim_reward, new_sim_state, 0)
+                    self.model_update(sim_state, sim_action, None, sim_reward, new_sim_state, 0) # till hereeeee
                     
                     pred = self.SA_predict(state)
                     
