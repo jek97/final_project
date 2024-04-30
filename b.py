@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from collections import defaultdict
 import math as mth
+import random as rnd
 
 # Available actions:
 UP = 0 
@@ -199,7 +200,6 @@ class Algorithm():
         
         return traj
     
-
     def dyna_q_test(self):
         # initialization
         time_out = self.rows * self.column
@@ -225,36 +225,68 @@ class Algorithm():
                 
                 action = self.eps_greedy_action(state)
                 timestep = self.env.step(action)
+                print("state", state, "action", action)
+                print("A", self.model[state, action])
+
                 n_s = timestep.observation
                 n_state = (n_s[0], n_s[1])
                 reward = float(timestep.reward)
                 cum_rew += reward
-                print("A state", state, "action", action, "reward", reward, "new state", n_state)
+
+                print("new_state", n_state, "reward", reward)
 
                 if (save == True): traj.append([state, action])
                 if (reward != 0): print("reward ", reward, "state ", state) 
                 
-                print("B model", self.model[state, action])
                 self.model_update(state, action, t, reward, n_state)
-                print("C model", self.model[state, action])
+
+                print("B", self.model[state, action])
+
                 PQueue = self.pq_update(state, action, reward, n_state, PQueue)
-                print("D PQ", PQueue)
+
+                print("C PQ", PQueue)
                 
                 sim_count = -1
-                while ((PQueue != []) and (sim_count <= self.n_simulations)):
+                #while (sim_count <= min(self.n_simulations, len(self.model.keys()))):
+                
+                m_size = [self.model[key][0] for key in self.model]
+                ms = 0
+                for a in m_size:
+                    ms += a
+                print("ms", ms)
+                n_sim = min(self.n_simulations, ms)
+                for i in range(n_sim):
+                    print("model", self.model)
+                    print("len model", len(self.model.values()))
                     sim_count += 1
-                    sim_state, sim_action = PQueue[0][0:2]
-                    del PQueue[0]
-                    print("E sim state", sim_state, "sim action", sim_action)
+                    if (PQueue != []):
+                        sim_state, sim_action = PQueue[0][0:2]
+
+                        print("D PQ taken", PQueue[0])
+
+                        del PQueue[0]
+                    else:
+                        #state, action = random.sample(self.model.keys(), 1)[0]
                         
+                        sim_state, sim_action = rnd.sample(self.model.keys(), 1)[0]
+
+                        print("D1 sim_state", sim_state, "sim_action", sim_action)
+
+                    print("E simulation ", self.model[sim_state, sim_action])
+
                     new_sim_state, sim_reward = self.simulation(sim_state, sim_action, t)
-                    print("F sim new state", new_sim_state, "sim reward", sim_reward)
+
+                    print("F new sim state", new_sim_state, "sim reward", sim_reward)
                     print("G model", self.model[sim_state, sim_action])
+
                     self.q_update(sim_state, sim_action, sim_reward, new_sim_state)
+
                     print("H model", self.model[sim_state, sim_action])
+                    
                     pred = self.SA_predict(state)
-                    print("I pred", pred)
+                    print("I predictions", pred)
                     for pr in pred:
+                        print("L PQ", PQueue)
                         PQueue = self.pq_update(pr[0], pr[1], pr[2], state, PQueue)
 
                 
@@ -267,6 +299,7 @@ class Algorithm():
                     old_t = t
                     self.cumm_rew.append(cum_rew)
                     done = True
+                    print("                                                                                                                                                                                                                        ")
         
         return traj
     
@@ -375,9 +408,17 @@ class Algorithm():
         plt.show()  # Show the plot
     
 def main(): 
-    
+    """
     env = DunegeonEnvironment()
-    solver = Algorithm(env, 0.2, 0.9, 0.01, 1, 5, 0.01)
+    solver = Algorithm(env, 0.2, 0.9, 0.01, 100, 5, 0.01)
+    traj = solver.dyna_q()
+    policy = solver.policy_eval()
+    #print("model", solver.model)
+    solver.plot_arrow_grid(policy, traj, "graph")
+    solver.plot_data()
+    """
+    env = DunegeonEnvironment()
+    solver = Algorithm(env, 0.2, 0.9, 0.01, 1, 10, 0.01)
     traj = solver.dyna_q_test()
     policy = solver.policy_eval()
     #print("model", solver.model)
