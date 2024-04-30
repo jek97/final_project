@@ -15,4 +15,4 @@ Update: found an error, i was modifing the model even in simulation, instead of 
 
 Update: tring to modify the model in a single dict, check functions and order of the arguments, it may be wrong sometimes.
 
-
+Update: made a single dict, much faster, thinking about create one dict for the q and one for the model, also created a bell shaped function if i want ot vary eps and alpha along the episodes.
