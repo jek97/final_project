@@ -15,6 +15,6 @@ Update: found an error, i was modifing the model even in simulation, instead of 
 
 Update: tring to modify the model in a single dict, check functions and order of the arguments, it may be wrong sometimes.
 
-Update: made a single dict, much faster, thinking about create one dict for the q and one for the model, also created a bell shaped function if i want ot vary eps and alpha along the episodes.
+Update: made a single dict, much faster, thinking about create one dict for the q and one for the model, also created a bell shaped function if i want to vary eps and alpha along the episodes.
 
-Update: i will modify the code for expand the model only when we actually visit a state
+Update: modified to actually expand the model only with states/actions encountered. also found some error in simulation phase with the states passed to the functions.

@@ -30,7 +30,7 @@ class Algorithm():
         self.n_episode = n_ep
         self.n_simulations = n_sim
         self.sim_k = sim_k
-        self.model = defaultdict(lambda: [0, 0, 0, []]) # occurence, time, Q, new states
+        self.model = dict() # occurence, time, Q, new states
 
         # plotting informations:
         self.holes = env._HOLES
@@ -45,8 +45,13 @@ class Algorithm():
         self.cumm_rew = []
 
     def eps_greedy_action(self, state): # chose an epsilon greedy action for the given state
+        q = []
         actions = self.env.valid_actions(state) # get all the possible actions
-        q = [self.model[state, a][2] for a in actions] # get the q factors for all the actions
+        for act in actions: # for all the possible actions
+            try:
+                q.append(self.model[state, act][2]) # if we've encountered it add it to the q list
+            except:
+                q.append(0) # else init it to zero
 
         if (np.random.uniform() < self.epsilon): # not greedy
             del actions[q.index(max(q))] # remove the greedy action
@@ -58,8 +63,14 @@ class Algorithm():
     # verified
     
     def q_update(self, state, action, reward, new_state):
+        q = []
         actions = self.env.valid_actions(new_state) # get all the possible actions
-        q = [self.model[new_state, a][2] for a in actions] # get the q factors for all the actions
+        for act in actions: # for all the possible actions
+            try:
+                q.append(self.model[state, act][2]) # if we've encountered it add it to the q list
+            except:
+                q.append(0) # else init it to zero
+
         max_q = max(q) # check the maximum one        
         self.model[state, action][2] += self.alpha * (reward + max_q - self.model[state, action][2]) # update the q
 
@@ -67,21 +78,32 @@ class Algorithm():
 
     def model_update(self, state, action, time, reward, new_state):
         seen = False
-        self.model[state, action][0] += 1 # increase the occurence of the given state action couple
-        self.model[state, action][1] = time # update the last time step we encountered the state action/couple
-        for n_state in self.model[state, action][3]: # for all the new state/reward encountered after the state action couple
-            if (n_state[0] == new_state) and (n_state[1] == reward): # if we've already encountered the new state reward combination
-                n_state[2] += 1 # increase its coourence
-                seen = True 
-        if seen == False: # if we didn't encounter this new state reward couple
-            self.model[state, action][3].append([new_state, reward, 1]) # append the couple over the new states for the state action couple
+        try: # if we've already encountred the state action couple
+            self.model[state, action][0] += 1 # increase the occurence of the given state action couple
+            self.model[state, action][1] = time # update the last time step we encountered the state action/couple            
+            for i in range(len(self.model[state, action][3])): # for all the new state/reward encountered after the state action couple
+                if (self.model[state, action][3][i][0] == new_state) and (self.model[state, action][3][i][1] == reward): # if we've already encountered the new state reward combination
+                    self.model[state, action][3][i][2] += 1 # increase its coourence
+                    seen = True 
+            
+            if seen == False: # if we didn't encounter this new state reward couple
+                self.model[state, action][3].append([new_state, reward, 1]) # append the couple over the new states for the state action couple
+        
+        except: # else init it
+            self.model[state, action] = [1, time, 0, [[new_state, reward, 1]]]
+            
     
     # verified
 
     def pq_update(self, state, action, reward, new_state, PQ):
         done = False
+        q = []
         actions = self.env.valid_actions(new_state) # get all the possible actions
-        q = [self.model[new_state, a][2] for a in actions] # get the q factors for all the actions
+        for act in actions: # for all the possible actions
+            try:
+                q.append(self.model[new_state, act][2]) # if we've encountered it add it to the q list
+            except:
+                q.append(0) # else init it to zero
         max_q = max(q) # check the maximum one
         p = abs(reward + max_q - self.model[state, action][2]) # get the q update
         
@@ -177,14 +199,14 @@ class Algorithm():
                     sim_state, sim_action = PQueue[0][0:2]
                     del PQueue[0]
                         
-                    new_sim_state, sim_reward = self.simulation(sim_state, sim_action, t)
+                    sim_new_state, sim_reward = self.simulation(sim_state, sim_action, t)
                     
-                    self.q_update(sim_state, sim_action, sim_reward, new_sim_state)
+                    self.q_update(sim_state, sim_action, sim_reward, sim_new_state)
                     
-                    pred = self.SA_predict(state)
+                    pred = self.SA_predict(sim_state)
                     
                     for pr in pred:
-                        PQueue = self.pq_update(pr[0], pr[1], pr[2], state, PQueue)
+                        PQueue = self.pq_update(pr[0], pr[1], pr[2], sim_state, PQueue)
 
                 
                 state = n_state
@@ -234,7 +256,7 @@ class Algorithm():
                 if (save == True): traj.append([state, action])
                 if (reward != 0): print("reward ", reward, "state ", state) 
                 
-                print("B model", self.model[state, action])
+                
                 self.model_update(state, action, t, reward, n_state)
                 print("C model", self.model[state, action])
                 PQueue = self.pq_update(state, action, reward, n_state, PQueue)
@@ -252,10 +274,11 @@ class Algorithm():
                     print("G model", self.model[sim_state, sim_action])
                     self.q_update(sim_state, sim_action, sim_reward, new_sim_state)
                     print("H model", self.model[sim_state, sim_action])
-                    pred = self.SA_predict(state)
+                    pred = self.SA_predict(sim_state)
                     print("I pred", pred)
                     for pr in pred:
-                        PQueue = self.pq_update(pr[0], pr[1], pr[2], state, PQueue)
+                        PQueue = self.pq_update(pr[0], pr[1], pr[2], sim_state, PQueue)
+                        print("L PQ", PQueue)
 
                 
                 state = n_state
@@ -273,9 +296,16 @@ class Algorithm():
     def policy_eval(self):
         policy = np.ones((self.rows, self.column)) * 5
         for state in self.states:
+            q = []
+            a_actions = []
             actions = self.env.valid_actions(state) # get all the possible actions
-            q = [self.model[state, a][2] for a in actions if self.model[state, a][0] > 0] # get the q factors for all the actions
-            actions = [a for a in actions if self.model[state, a][0] > 0] # get the q factors for all the actions
+            for act in actions: # for all the possible actions
+                try:
+                    q.append(self.model[state, act][2]) # if we've encountered it add it to the q list
+                    a_actions.append(act)
+                except:
+                    pass
+
             try:
                 policy[state[0]][state[1]] = actions[q.index(max(q))]
             except:
@@ -375,14 +405,17 @@ class Algorithm():
         plt.show()  # Show the plot
     
 def main(): 
+
     
     env = DunegeonEnvironment()
-    solver = Algorithm(env, 0.2, 0.9, 0.01, 1, 5, 0.01)
+    solver = Algorithm(env, 0.2, 0.2, 0.001, 2, 5, 0.0001)
     traj = solver.dyna_q_test()
     policy = solver.policy_eval()
-    #print("model", solver.model)
+    print("model", solver.model)
     solver.plot_arrow_grid(policy, traj, "graph")
     solver.plot_data()
+    
+    
        
     
     
@@ -396,7 +429,7 @@ DEBUG
     env = DunegeonEnvironment()
     solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1,  0.2)
     
-    solver.model[(10, 1), 2][2] = 2
+    solver.model[(10, 1), 2] = [0, 0, 2, []]
     act = solver.eps_greedy_action((10, 1))
     print("act", act)
 
@@ -405,7 +438,7 @@ DEBUG
     env = DunegeonEnvironment()
     solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1,  0.2)
     
-    solver.model[(10, 1), 2][2] = 2
+    solver.model[(10, 1), 2] = [0, 0, 2, []]
     print("model_b", solver.model)
     solver.q_update((10, 1), 2, 5, (10, 2))
     print("model_a", solver.model)
@@ -428,6 +461,7 @@ DEBUG
     solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1,  0.2)
     pq = []
     print("pq 1", pq)
+    solver.model_update((10, 1), 2, 5, 3, (10, 2))
     pq = solver.pq_update((10, 1), 2, 3, (10, 2), pq)
     print("pq 2", pq)
     pq = solver.pq_update((10, 1), 2, 4, (10, 2), pq)
