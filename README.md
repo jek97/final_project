@@ -11,7 +11,7 @@ The algorithm works by the estimation of the state-action values Q(s,a), alernat
 In the first part the environment is experienced by the agent, collecting at each interaction the reward signal and new state, used to update the state-action values together with the environment model.
 After that a series of simulations is perfomed, based on the updated environment, continuing to improve the state-action values based on the agent experience of the environment. 
 
-![Dyna-Q algorithm](images/dyna-q.jpg "Dyna-Q algorithm")
+![Dyna-Q algorithm](/images/dyna-q.jpg "Dyna-Q algorithm")
 
 ## Environment characteristics:
 In this project the proposed environment is constituted by a 2D grid world.
@@ -47,7 +47,7 @@ $R_{+} = R + c\sqrt{\tau}$
 where:
 - R: the reward experienced in the realworld interaction.
 - c: a costant tuning weighting the bonus.
-- $\tau : the time elapsed form the last occurence of the given state/action couple.
+- $\tau$ : the time elapsed form the last occurence of the given state/action couple.
 The general idea is that over the simulation phase the increased simulated reward will inflate the state-action value of the couples untried for a long time.
 In that way at the next \varepsilon -greedy action selection the probability of chosing that action will increase, forcing the agent to try long untried actions in search of a variation of the environment.
 This modification of the algorithm leads to the Dyna-Q + algorithm.
