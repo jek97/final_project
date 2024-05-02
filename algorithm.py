@@ -67,11 +67,11 @@ class Algorithm():
         actions = self.env.valid_actions(new_state) # get all the possible actions
         for act in actions: # for all the possible actions
             try:
-                q.append(self.model[state, act][2]) # if we've encountered it add it to the q list
+                q.append(self.model[new_state, act][2]) # if we've encountered it add it to the q list
             except:
                 q.append(0) # else init it to zero
 
-        max_q = max(q) # check the maximum one        
+        max_q = max(q) # check the maximum one    
         self.model[state, action][2] += self.alpha * (reward + max_q - self.model[state, action][2]) # update the q
 
     # verified
@@ -106,11 +106,15 @@ class Algorithm():
                 q.append(0) # else init it to zero
         max_q = max(q) # check the maximum one
         p = abs(reward + max_q - self.model[state, action][2]) # get the q update
-        
+
+        #print("state", state, "action", action, "reward", reward,"new_state", new_state, "p", p)
+        #print("model state action", self.model[state, action])
+        #print("max q", max_q)
         if (p > self.theta):
             for pq_e in PQ: # for all the element of the list
                 if (pq_e[0] == state) and (pq_e[1] == action): # if i've already the element in the list update the priority
-                    pq_e[2] = p
+                    if (pq_e[2] < p):
+                        pq_e[2] = p
                     done = True
                     
             if (done == False): # else put it in the list
@@ -131,7 +135,7 @@ class Algorithm():
         ns_idx = np.random.choice(choices, p = pos_probabilities)
         new_state = pos_outcomes[ns_idx][0]
         reward = pos_outcomes[ns_idx][1] + self.sim_k * np.sqrt(sa_time)
-        
+       
         return new_state, reward
     
     # verified
@@ -141,7 +145,7 @@ class Algorithm():
         for key in self.model.keys():
             for ns in self.model[key][3]:
                 if (ns[0] == state):
-                    predict.append([key[0], key[1], ns[1],])
+                    predict.append([key[0], key[1], ns[1]])
         return predict
     
     # verified
@@ -154,8 +158,6 @@ class Algorithm():
         else:
             return s
         
-
-
 
     def dyna_q(self):
         # initialization
@@ -212,11 +214,11 @@ class Algorithm():
                 state = n_state
 
                 if ((timestep.is_last()) or (t >= t_out)): # if we reached the end of the episode or the step limit (to prevent loops)
-                    t_out = t + time_out
                     print("episode: ", i, " steps: ", t - old_t, " cum reward: ", cum_rew)
                     self.finish_rt .append(t - old_t)
-                    old_t = t
                     self.cumm_rew.append(cum_rew)
+                    t_out = t + time_out
+                    old_t = t
                     done = True
         
         return traj
@@ -224,7 +226,7 @@ class Algorithm():
 
     def dyna_q_test(self):
         # initialization
-        time_out = self.rows * self.column
+        time_out = self.rows * self.column * 10
         t_out = self.rows * self.column
         t = 0
         old_t = 0
@@ -236,6 +238,7 @@ class Algorithm():
             done = False
             cum_rew = 0
             traj = []
+            #PQueue = []
             if (i == (self.n_episode - 1)): save = True
 
             s = self.env.reset().observation # observe the initial state
@@ -251,35 +254,35 @@ class Algorithm():
                 n_state = (n_s[0], n_s[1])
                 reward = float(timestep.reward)
                 cum_rew += reward
-                print("A state", state, "action", action, "reward", reward, "new state", n_state)
+                #print("\n")
+                #print("A state", state, "action", action, "reward", reward, "new state", n_state)
 
                 if (save == True): traj.append([state, action])
                 if (reward != 0): print("reward ", reward, "state ", state) 
                 
                 
                 self.model_update(state, action, t, reward, n_state)
-                print("C model", self.model[state, action])
-                PQueue = self.pq_update(state, action, reward, n_state, PQueue)
-                print("D PQ", PQueue)
+                #print("B model state action ",self.model[state, action] )
                 
-                sim_count = -1
+                PQueue = self.pq_update(state, action, reward, n_state, PQueue)
+                #print("C PQ", PQueue)
+                
+                sim_count = 0
                 while ((PQueue != []) and (sim_count <= self.n_simulations)):
                     sim_count += 1
                     sim_state, sim_action = PQueue[0][0:2]
                     del PQueue[0]
-                    print("E sim state", sim_state, "sim action", sim_action)
-                        
+                    #print("D PQ", PQueue)
                     new_sim_state, sim_reward = self.simulation(sim_state, sim_action, t)
-                    print("F sim new state", new_sim_state, "sim reward", sim_reward)
-                    print("G model", self.model[sim_state, sim_action])
+                    #print("sim_state", sim_state, "sim action", sim_action, "new sim state", new_sim_state, "sim reward", sim_reward)
+                    #print("model sim B", self.model[sim_state, sim_action])
                     self.q_update(sim_state, sim_action, sim_reward, new_sim_state)
-                    print("H model", self.model[sim_state, sim_action])
+                    #print("model sim A", self.model[sim_state, sim_action])
                     pred = self.SA_predict(sim_state)
-                    print("I pred", pred)
+                    #print("pred", pred)
                     for pr in pred:
                         PQueue = self.pq_update(pr[0], pr[1], pr[2], sim_state, PQueue)
-                        print("L PQ", PQueue)
-
+                        #print("PQ F", PQueue)
                 
                 state = n_state
 
@@ -307,7 +310,7 @@ class Algorithm():
                     pass
 
             try:
-                policy[state[0]][state[1]] = actions[q.index(max(q))]
+                policy[state[0]][state[1]] = a_actions[q.index(max(q))]
             except:
                 pass
         return policy
@@ -405,15 +408,14 @@ class Algorithm():
         plt.show()  # Show the plot
     
 def main(): 
-
     
     env = DunegeonEnvironment()
-    solver = Algorithm(env, 0.2, 0.2, 0.001, 2, 5, 0.0001)
+    solver = Algorithm(env, 0.2, 0.2, 0.001, 50, 10, 0.01)
     traj = solver.dyna_q_test()
     policy = solver.policy_eval()
-    print("model", solver.model)
     solver.plot_arrow_grid(policy, traj, "graph")
     solver.plot_data()
+    
     
     
        
@@ -427,9 +429,29 @@ if __name__ == "__main__":
 DEBUG
     # eps_greedy_action: 
     env = DunegeonEnvironment()
-    solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1,  0.2)
+    solver = Algorithm(env, 0.5, 0.5, 0.1, 1, 1,  0.2)
     
     solver.model[(10, 1), 2] = [0, 0, 2, []]
+    solver.model[(10, 1), 0] = [0, 0, 4, []]
+    solver.model[(10, 1), 1] = [0, 0, 0, []]
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
+    act = solver.eps_greedy_action((10, 1))
+    print("act", act)
     act = solver.eps_greedy_action((10, 1))
     print("act", act)
 
@@ -439,6 +461,7 @@ DEBUG
     solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1,  0.2)
     
     solver.model[(10, 1), 2] = [0, 0, 2, []]
+    solver.model[(10, 2), 1] = [0, 0, 3, []]
     print("model_b", solver.model)
     solver.q_update((10, 1), 2, 5, (10, 2))
     print("model_a", solver.model)
@@ -448,11 +471,13 @@ DEBUG
     env = DunegeonEnvironment()
     solver = Algorithm(env, 0.3, 0.5, 0.1, 1, 1,  0.2)
     
-    solver.model[(10, 1), 2][2] = 2
+    #solver.model[(10, 1), 2][2] = 2
     print("model_1", solver.model)
     solver.model_update((10, 1), 2, 5, 3, (10, 2))
     print("model_2", solver.model)
     solver.model_update((10, 1), 2, 10, 3, (10, 2))
+    print("model_3", solver.model)
+    solver.model_update((10, 1), 2, 15, 2, (10, 4))
     print("model_3", solver.model)
 
 
