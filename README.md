@@ -11,7 +11,7 @@ The algorithm works by the estimation of the state-action values Q(s,a), alernat
 In the first part the environment is experienced by the agent, collecting at each interaction the reward signal and new state, used to update the state-action values together with the environment model.
 After that a series of simulations is perfomed, based on the updated environment, continuing to improve the state-action values based on the agent experience of the environment. 
 
-![Dyna-Q algorithm](/images/dyna-q.jpg "Dyna-Q algorithm")
+![Dyna-Q algorithm](/images/dyna-q.jpeg "Dyna-Q algorithm")
 
 ## Environment characteristics:
 In this project the proposed environment is constituted by a 2D grid world.
