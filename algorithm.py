@@ -24,8 +24,8 @@ class Algorithm():
         self.states = env.all_states()
 
         # dyna-q parameters
-        self.epsilon = epsilon
-        self.alpha = alpha
+        self.epsilon_in = epsilon
+        self.alpha_in = alpha
         self.theta = theta
         self.n_episode = n_ep
         self.n_simulations = n_sim
@@ -43,6 +43,8 @@ class Algorithm():
         self.start_state = []
         self.finish_rt = []
         self.cumm_rew = []
+        self.record_eps = []
+        self.record_alpha = []
 
     def eps_greedy_action(self, state): # chose an epsilon greedy action for the given state
         q = []
@@ -173,7 +175,10 @@ class Algorithm():
             done = False
             cum_rew = 0
             traj = []
-            #PQueue = []
+            self.epsilon = self.dec_bell_shaped_function(0.5, (0.25 * self.n_episode), 0.1, (0.5 * self.n_episode), i)
+            self.record_eps.append(self.epsilon)
+            self.alpha = self.dec_bell_shaped_function(0.8, (0.5 * self.n_episode), 0.2, (0.75 * self.n_episode), i)
+            self.record_alpha.append(self.alpha)
             if (i == (self.n_episode - 1)): save = True
 
             s = self.env.reset().observation # observe the initial state
@@ -231,78 +236,6 @@ class Algorithm():
         
         return traj
     
-
-    def dyna_q_test(self):
-        # initialization
-        time_out = self.rows * self.column * 10
-        t_out = self.rows * self.column
-        t = 0
-        old_t = 0
-        cum_rew = 0
-        PQueue = []
-        save = False
-        
-        for i in range(self.n_episode):
-            done = False
-            cum_rew = 0
-            traj = []
-            #PQueue = []
-            if (i == (self.n_episode - 1)): save = True
-
-            s = self.env.reset().observation # observe the initial state
-            state = (s[0], s[1])
-            self.start_state = state
-
-            while not done:
-                t += 1
-                
-                action = self.eps_greedy_action(state)
-                timestep = self.env.step(action)
-                n_s = timestep.observation
-                n_state = (n_s[0], n_s[1])
-                reward = float(timestep.reward)
-                cum_rew += reward
-                #print("\n")
-                #print("A state", state, "action", action, "reward", reward, "new state", n_state)
-
-                if (save == True): traj.append([state, action])
-                if (reward != 0): print("reward ", reward, "state ", state) 
-                
-                
-                self.model_update(state, action, t, reward, n_state)
-                #print("B model state action ",self.model[state, action] )
-                
-                PQueue = self.pq_update(state, action, reward, n_state, PQueue)
-                #print("C PQ", PQueue)
-                
-                sim_count = 0
-                while ((PQueue != []) and (sim_count <= self.n_simulations)):
-                    sim_count += 1
-                    sim_state, sim_action = PQueue[0][0:2]
-                    del PQueue[0]
-                    #print("D PQ", PQueue)
-                    new_sim_state, sim_reward = self.simulation(sim_state, sim_action, t)
-                    #print("sim_state", sim_state, "sim action", sim_action, "new sim state", new_sim_state, "sim reward", sim_reward)
-                    #print("model sim B", self.model[sim_state, sim_action])
-                    self.q_update(sim_state, sim_action, sim_reward, new_sim_state)
-                    #print("model sim A", self.model[sim_state, sim_action])
-                    pred = self.SA_predict(sim_state)
-                    #print("pred", pred)
-                    for pr in pred:
-                        PQueue = self.pq_update(pr[0], pr[1], pr[2], sim_state, PQueue)
-                        #print("PQ F", PQueue)
-                
-                state = n_state
-
-                if ((timestep.is_last()) or (t >= t_out)): # if we reached the end of the episode or the step limit (to prevent loops)
-                    t_out = t + time_out
-                    print("episode: ", i, " steps: ", t - old_t, " cum reward: ", cum_rew)
-                    self.finish_rt .append(t - old_t)
-                    old_t = t
-                    self.cumm_rew.append(cum_rew)
-                    done = True
-        
-        return traj
     
     def policy_eval(self):
         policy = np.ones((self.rows, self.column)) * 5
@@ -398,28 +331,48 @@ class Algorithm():
         plt.savefig(graph_name) 
 
     def plot_data(self):
-        print("cumm reward ", self.cumm_rew)
-
-        # Plot the functions
-        plt.figure(figsize=(8, 6))  # Set the size of the figure
-
-        plt.plot(range(len(self.cumm_rew)), self.cumm_rew, label='cumulative reward')  # Plot the first function
-        plt.plot(range(len(self.finish_rt)), self.finish_rt, label='real time')  # Plot the second function
-
+        
+        # Plot timesteps
+        plt.figure(1, figsize=(8, 6))  # Set the size of the figure
+        plt.plot(range(len(self.finish_rt)), self.finish_rt)  # Plot the second function
         plt.xlabel('episodes')  # Label for x-axis
-        plt.ylabel('y')  # Label for y-axis
-        plt.title('Plot of cumulative reward = f(episodes) and episede steps = f(episodes)')  # Title of the plot
+        plt.ylabel('time')  # Label for y-axis
+        plt.title('timesteps = f(episodes)')  # Title of the plot
+        plt.grid(True)  # Add grid
+        plt.show()  # Show the plot
+        
+        # plot cumulative rewards
+        plt.figure(2, figsize=(8, 6))  # Set the size of the figure
+        plt.plot(range(len(self.cumm_rew)), self.cumm_rew)  # Plot the first function
+        plt.xlabel('episodes')  # Label for x-axis
+        plt.ylabel('time')  # Label for y-axis
+        plt.title('cumulative reward = f(episodes)')  # Title of the plot
+        plt.grid(True)  # Add grid
+        plt.show()  # Show the plot
 
-        plt.legend()  # Display legend
+        # plot epsilon
+        plt.figure(3, figsize=(8, 6))  # Set the size of the figure
+        plt.plot(range(len(self.record_eps)), self.record_eps)  # Plot the first function
+        plt.xlabel('episodes')  # Label for x-axis
+        plt.ylabel('time')  # Label for y-axis
+        plt.title('epsilon = f(episodes)')  # Title of the plot
+        plt.grid(True)  # Add grid
+        plt.show()  # Show the plot
 
+        # plot epsilon
+        plt.figure(4, figsize=(8, 6))  # Set the size of the figure
+        plt.plot(range(len(self.record_alpha)), self.record_alpha)  # Plot the first function
+        plt.xlabel('episodes')  # Label for x-axis
+        plt.ylabel('time')  # Label for y-axis
+        plt.title('alpha = f(episodes)')  # Title of the plot
         plt.grid(True)  # Add grid
         plt.show()  # Show the plot
     
 def main(): 
     
     env = DunegeonEnvironment()
-    solver = Algorithm(env, 0.2, 0.2, 0.001, 50, 10, 0.01)
-    traj = solver.dyna_q_test()
+    solver = Algorithm(env, 0.2, 0.2, 0.001, 100, 10, 0.01)
+    traj = solver.dyna_q()
     policy = solver.policy_eval()
     solver.plot_arrow_grid(policy, traj, "graph")
     solver.plot_data()
