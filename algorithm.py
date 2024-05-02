@@ -161,7 +161,7 @@ class Algorithm():
 
     def dyna_q(self):
         # initialization
-        time_out = self.rows * self.column
+        time_out = self.rows * self.column * 10
         t_out = self.rows * self.column
         t = 0
         old_t = 0
@@ -173,6 +173,7 @@ class Algorithm():
             done = False
             cum_rew = 0
             traj = []
+            #PQueue = []
             if (i == (self.n_episode - 1)): save = True
 
             s = self.env.reset().observation # observe the initial state
@@ -188,37 +189,44 @@ class Algorithm():
                 n_state = (n_s[0], n_s[1])
                 reward = float(timestep.reward)
                 cum_rew += reward
+                #print("\n")
+                #print("A state", state, "action", action, "reward", reward, "new state", n_state)
 
                 if (save == True): traj.append([state, action])
                 if (reward != 0): print("reward ", reward, "state ", state) 
                 
-                self.model_update(state, action, t, reward, n_state)
-                PQueue = self.pq_update(state, action, reward, n_state, PQueue)
                 
-                sim_count = -1
+                self.model_update(state, action, t, reward, n_state)
+                #print("B model state action ",self.model[state, action] )
+                
+                PQueue = self.pq_update(state, action, reward, n_state, PQueue)
+                #print("C PQ", PQueue)
+                
+                sim_count = 0
                 while ((PQueue != []) and (sim_count <= self.n_simulations)):
                     sim_count += 1
                     sim_state, sim_action = PQueue[0][0:2]
                     del PQueue[0]
-                        
-                    sim_new_state, sim_reward = self.simulation(sim_state, sim_action, t)
-                    
-                    self.q_update(sim_state, sim_action, sim_reward, sim_new_state)
-                    
+                    #print("D PQ", PQueue)
+                    new_sim_state, sim_reward = self.simulation(sim_state, sim_action, t)
+                    #print("sim_state", sim_state, "sim action", sim_action, "new sim state", new_sim_state, "sim reward", sim_reward)
+                    #print("model sim B", self.model[sim_state, sim_action])
+                    self.q_update(sim_state, sim_action, sim_reward, new_sim_state)
+                    #print("model sim A", self.model[sim_state, sim_action])
                     pred = self.SA_predict(sim_state)
-                    
+                    #print("pred", pred)
                     for pr in pred:
                         PQueue = self.pq_update(pr[0], pr[1], pr[2], sim_state, PQueue)
-
+                        #print("PQ F", PQueue)
                 
                 state = n_state
 
                 if ((timestep.is_last()) or (t >= t_out)): # if we reached the end of the episode or the step limit (to prevent loops)
+                    t_out = t + time_out
                     print("episode: ", i, " steps: ", t - old_t, " cum reward: ", cum_rew)
                     self.finish_rt .append(t - old_t)
-                    self.cumm_rew.append(cum_rew)
-                    t_out = t + time_out
                     old_t = t
+                    self.cumm_rew.append(cum_rew)
                     done = True
         
         return traj
