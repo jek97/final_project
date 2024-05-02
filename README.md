@@ -1,16 +1,15 @@
 # Dyna-Q + with prioritized sweeping:
 ## Introduction:
-The problem of Reinforcement Learning is the optimal control of incompletely-known Markow decision processes, in other words it consider the interaction of an agent with the environment through actions.
-Each action modify the state in which the agent is based on the environment model, providing a numeric signal called reward.
-The main purpose of the agent is to find a policy - a mapping from situations to actions - to obtain the maximum cumulative reward over the task.
-Under this scenario a model of the system is represented by a probability distribution expressing the probability for the action to end in the state S' and collect the reward R once perfored the action A in state S.
-Instead as state-action value Q(s,a) we mean 
+The challenge in Reinforcement Learning lies in achieving optimal control within partially known Markov decision processes. Put simply, it involves the dynamic interplay between an agent and its environment through actions.
+Each action alters the agent's state based on the environment's dynamics, yielding a numerical signal known as a reward.
+The primary objective for the agent is to devise a policy — a mapping situations to actions — that maximizes the cumulative reward throughout the task.
+In this context, a model of the system is represented by a probability distribution, indicating the likelihood of transitioning from state S to state S' and receiving reward R upon executing action A in state S.
+While a state-action value ${Q_(\pi)}(s,a)$ represent the expected cumulative reward obtained by the agent starting in state S, following as first action A, and a gven policy thereafter.
 
-In this field the Dyna-Q algorithm adresses the learning of a policy together with a model of the environment, assumed to be deterministic and finite, online in a modelfree fashion.
-The algorithm works by the estimation of the state-action values Q(s,a), alernating interactions with the environment, with simulations.
-In the first part the environment is experienced by the agent, collecting at each interaction the reward signal and new state, used to update the state-action values together with the environment model.
-After that a series of simulations is perfomed, based on the updated environment, continuing to improve the state-action values based on the agent experience of the environment. 
-
+In this domain, the Dyna-Q algorithm tackles the simultaneous learning of a policy and a model of the environment, operating online in a model-free manner, assuming the environment to be deterministic and finite.
+The algorithm functions by iteratively estimating the state-action values Q(s,a) through alternating interactions with the environment and simulations.
+Initially, the agent engages with the environment, gathering reward signals and new states at each interaction. These updates are utilized to refine both the state-action values and the environment model.
+Subsequently, a series of simulations are conducted based on the updated environment model. These simulations further refine the state-action values, leveraging the agent's experiential knowledge of the environment.
 ![Dyna-Q algorithm](/images/dyna-q.jpeg "Dyna-Q algorithm")
 
 ## Environment characteristics:
@@ -23,13 +22,14 @@ In it a series of elements can be identified:
 - Portals: showed by circled letters in the picture, they teleport the agent from one entry to the other.
 - Holes: showed in black in the picture, if encountered they end the episode, retruning a negative reward.
 - Treasures: in yellow in the picture, they can be collected along the path providing a positive reward.
+- starting state: shown in green in the picture.
+- goal state: shown in red in the pictur, if encountered it finsh th episode, returning a positive reward.
 
 It can be seen how both the state and action space are finite, respecting the Dyna-Q requirements.
 
-In this environment the agent is allowed to move in the four cardinal directions (up, down, left, right) in a stochastic way.
-In detail the environment perturbate the agent motion, allowing it to realize the desired action in 50% of the cases, while making it land on the left or right state respect the desired action in the rest of the cases with same probability.
+In this setting, the agent can navigate in the four cardinal directions (up, down, left, right) in a stochastic manner. This implies that the environment introduces randomness into the agent's movements, enabling it to execute the intended action successfully in 50% of instances. In the remaining cases, with equal probability, the agent ends up in either the left or right state along the desired direction, despite its intended action.
 
-Immagine stochasticity of the environment
+![Stochasticity](/images/stoc_env.jpg "Stochasticity")
 
 As we can see the stochasticity of the environment breaks the Dyna-Q requirement of a deterministic environment, moreover the disappearance of the treasure once collected shows the dynamic feature of the system, increasing the environment complexity.
 
@@ -49,7 +49,8 @@ where:
 - c: a costant tuning weighting the bonus.
 - $\tau$ : the time elapsed form the last occurence of the given state/action couple.
 The general idea is that over the simulation phase the increased simulated reward will inflate the state-action value of the couples untried for a long time.
-In that way at the next \varepsilon -greedy action selection the probability of chosing that action will increase, forcing the agent to try long untried actions in search of a variation of the environment.
+
+In that way at the next $\varepsilon$-greedy action selection the probability of chosing that action will increase, forcing the agent to try long untried actions in search of a variation of the environment.
 This modification of the algorithm leads to the Dyna-Q + algorithm.
 # Dyna-Q + with prioritized sweeping:
 introduction on what is the dyna Q
