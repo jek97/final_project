@@ -16,7 +16,7 @@ After that a series of simulations is perfomed, based on the updated environment
 ## Environment characteristics:
 In this project the proposed environment is constituted by a 2D grid world.
 
-Immage environment
+![Environment](/images/graph.png "Environment")
 
 In it a series of elements can be identified:
 - Obstacles: showed in gray in the picture, they limit the agent's possible motions along the environment.
