@@ -14,9 +14,7 @@ Subsequently, a series of simulations are conducted based on the updated environ
 
 ## Environment characteristics:
 In this project the proposed environment is constituted by a 2D grid world.
-
 ![Environment](/images/graph.png "Environment")
-
 In it a series of elements can be identified:
 - Obstacles: showed in gray in the picture, they limit the agent's possible motions along the environment.
 - Portals: showed by circled letters in the picture, they teleport the agent from one entry to the other.
@@ -52,6 +50,18 @@ The general idea is that over the simulation phase the increased simulated rewar
 
 In that way at the next $\varepsilon$-greedy action selection the probability of chosing that action will increase, forcing the agent to try long untried actions in search of a variation of the environment.
 This modification of the algorithm leads to the Dyna-Q + algorithm.
+
+## Optimization:
+A further optimization of the proposed algorithm may be realized with the adoption of the prioritized sweeping approach, shown in picture:
+In essence, this approach involves scrutinizing the state-action value updates during both the simulation and interaction phases. If a particular update exceeds a predefined threshold, the corresponding state-action pair is enlisted in an ordered list based on the magnitude of the update.
+Indeed, due to the low reward density of the system, many time the state-action update would run whith a zero or quasi-zero reward and/or a small update given by the state-action value of the next state. To avoid unnecessary evaluations, updates are initially assessed and then processed at a later stage.
+Additionally in the state-action value update we would like to prioritize the largest ones, that will meaningfully change its value, and consiquently the policy; following this reasoning the update entity cover the role of a priority index.
+That list will then be processed in a second step, starting from the element with highest priority.
+
+Finally, noteworthy updates stemming from rewards on specific state-action pairs induce significant variations in their respective state-action values. This effect can propagate to other state-action pairs predicted to lead to the newly updated state-action pair, with their priorities assessed and inclusion in the list when warranted.
+
+![Prioritized sweeping](/images/prioritized_sweeping.jpg "Prioritized sweeping")
+
 # Dyna-Q + with prioritized sweeping:
 introduction on what is the dyna Q
 brief explanation of what we now of the environment
