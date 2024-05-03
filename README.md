@@ -64,8 +64,14 @@ Finally, noteworthy updates stemming from rewards on specific state-action pairs
 
 ## Implementation:
 In this section we will analyze in detail the implementation of the proposed algorithm.
-After an inizialization of the algorithm parameters and environment's informations, needed both for the algorithm and for the final plotting of the results, different methods are presented, this section will start from the resentation of the main method, digging deeper in the others methods once found.
-# some words on the algorithm properties and the model data structure
+First of all the main datastructure used for the representation of the model requires some explanation: 
+indeed the main data structure on which the implementation rely is the system model, in it each state/action couple is used as index for access its properties stored as an array of which the first three components are constituted by the number of occurence of the given state/action couple, the last time step at which the combination occured, the state-action value related to the combination and the new states.
+These last are saved as an additional vector, one for each next state/reward encountered, each composed by the new state, the reward obtained and the number of occurences of the new state/reward couple.
+
+![Model](/images/model.jpg "Model")
+
+After this introduction it's possible to analyse the code:
+Starting with an inizialization of the algorithm parameters and environment's informations, needed both for the algorithm and the final plotting of the results, different methods are presented, this section will start from the resentation of the main method, digging deeper in the others methods once found.
 
 ```
     def dyna_q(self):
@@ -248,6 +254,10 @@ This method, given the state as input, search over the whole model for a state/a
 
 Finally the main method update the priority list by the `` method for all the state/action obtained in the prediction phase.
 Thereafter the new experienced state is set as the current one and an if condition check for the end of the episode, done by reaching a terminal state or by reaching a threshold over the number of time steps; reset the time for the timestep threshold and collect the desired data.
+
+In the end, once the algorithm has performed the required number of episodes, it return th elast trajectory followed, that is then passed to the plotting methods for the display of the related graphs.
+
+## Hyper-parameter selection:
 
 # Dyna-Q + with prioritized sweeping:
 introduction on what is the dyna Q
