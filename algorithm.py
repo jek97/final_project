@@ -24,8 +24,8 @@ class Algorithm():
         self.states = env.all_states()
 
         # dyna-q parameters
-        self.epsilon_in = epsilon
-        self.alpha_in = alpha
+        self.epsilon = epsilon
+        self.alpha = alpha
         self.theta = theta
         self.n_episode = n_ep
         self.n_simulations = n_sim
@@ -160,24 +160,31 @@ class Algorithm():
         else:
             return s
         
+    def bell_shpaed_function(self, max, max_t, s, s_a_t, t):
+        if t < (max_t - s_a_t):
+            return s
+        elif (max_t - s_a_t) <= t <= (s_a_t + max_t):
+            return s + (max/2) * (1 + mth.cos((t - max_t) * (mth.pi/(max_t + s_a_t))))
+        else:
+            return s
+        
 
     def dyna_q(self):
         # initialization
-        time_out = self.rows * self.column * 10
+        time_out = self.rows * self.column * 1.5
         t_out = self.rows * self.column
         t = 0
         old_t = 0
-        cum_rew = 0
         PQueue = []
         save = False
+        cum_rew = 0
         
         for i in range(self.n_episode):
             done = False
-            cum_rew = 0
             traj = []
-            self.epsilon = self.dec_bell_shaped_function(0.5, (0.25 * self.n_episode), 0.1, (0.5 * self.n_episode), i)
+            self.epsilon = self.dec_bell_shaped_function(0.4, (0.25 * self.n_episode), 0.1, (0.5 * self.n_episode), i)
             self.record_eps.append(self.epsilon)
-            self.alpha = self.dec_bell_shaped_function(0.8, (0.5 * self.n_episode), 0.2, (0.75 * self.n_episode), i)
+            self.alpha = self.bell_shpaed_function(0.4, (0.375 * self.n_episode), 0.2, (0.15 * self.n_episode), i)
             self.record_alpha.append(self.alpha)
             if (i == (self.n_episode - 1)): save = True
 
@@ -194,36 +201,25 @@ class Algorithm():
                 n_state = (n_s[0], n_s[1])
                 reward = float(timestep.reward)
                 cum_rew += reward
-                #print("\n")
-                #print("A state", state, "action", action, "reward", reward, "new state", n_state)
-
+                
                 if (save == True): traj.append([state, action])
                 if (reward != 0): print("reward ", reward, "state ", state) 
                 
                 
                 self.model_update(state, action, t, reward, n_state)
-                #print("B model state action ",self.model[state, action] )
-                
                 PQueue = self.pq_update(state, action, reward, n_state, PQueue)
-                #print("C PQ", PQueue)
                 
                 sim_count = 0
                 while ((PQueue != []) and (sim_count <= self.n_simulations)):
                     sim_count += 1
                     sim_state, sim_action = PQueue[0][0:2]
                     del PQueue[0]
-                    #print("D PQ", PQueue)
                     new_sim_state, sim_reward = self.simulation(sim_state, sim_action, t)
-                    #print("sim_state", sim_state, "sim action", sim_action, "new sim state", new_sim_state, "sim reward", sim_reward)
-                    #print("model sim B", self.model[sim_state, sim_action])
                     self.q_update(sim_state, sim_action, sim_reward, new_sim_state)
-                    #print("model sim A", self.model[sim_state, sim_action])
                     pred = self.SA_predict(sim_state)
-                    #print("pred", pred)
                     for pr in pred:
                         PQueue = self.pq_update(pr[0], pr[1], pr[2], sim_state, PQueue)
-                        #print("PQ F", PQueue)
-                
+                        
                 state = n_state
 
                 if ((timestep.is_last()) or (t >= t_out)): # if we reached the end of the episode or the step limit (to prevent loops)
@@ -289,24 +285,24 @@ class Algorithm():
                 color = 'black'
 
                 if grid[i][j] == 0:  # Up arrow
-                    plt.arrow(j, i, 0, -0.2, head_width=0.1, head_length=0.1, fc=color, ec=color)
+                    plt.arrow(j, i, 0, -0.3, head_width=0.1, head_length=0.1, fc=color, ec=color)
                 elif grid[i][j] == 1:  # Down arrow
-                    plt.arrow(j, i, 0, 0.2, head_width=0.1, head_length=0.1, fc=color, ec=color)
+                    plt.arrow(j, i, 0, 0.3, head_width=0.1, head_length=0.1, fc=color, ec=color)
                 elif grid[i][j] == 2:  # Left arrow
-                    plt.arrow(j, i, -0.2, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
+                    plt.arrow(j, i, -0.3, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
                 elif grid[i][j] == 3:  # Right arrow
-                    plt.arrow(j, i, 0.2, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
+                    plt.arrow(j, i, 0.3, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
         
         for tr in traj:
             color = 'red'
             if tr[1] == 0:  # Up arrow
-                plt.arrow(tr[0][1], tr[0][0], 0, -0.2, head_width=0.1, head_length=0.1, fc=color, ec=color)
+                plt.arrow(tr[0][1], tr[0][0], 0, -0.15, head_width=0.1, head_length=0.1, fc=color, ec=color)
             elif tr[1] == 1:  # Down arrow
-                plt.arrow(tr[0][1], tr[0][0], 0, 0.2, head_width=0.1, head_length=0.1, fc=color, ec=color)
+                plt.arrow(tr[0][1], tr[0][0], 0, 0.15, head_width=0.1, head_length=0.1, fc=color, ec=color)
             elif tr[1] == 2:  # Left arrow
-                plt.arrow(tr[0][1], tr[0][0], -0.2, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
+                plt.arrow(tr[0][1], tr[0][0], -0.15, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
             elif tr[1] == 3:  # Right arrow
-                plt.arrow(tr[0][1], tr[0][0], 0.2, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
+                plt.arrow(tr[0][1], tr[0][0], 0.15, 0, head_width=0.1, head_length=0.1, fc=color, ec=color)
             
 
         
@@ -332,15 +328,6 @@ class Algorithm():
 
     def plot_data(self):
         
-        # Plot timesteps
-        plt.figure(1, figsize=(8, 6))  # Set the size of the figure
-        plt.plot(range(len(self.finish_rt)), self.finish_rt)  # Plot the second function
-        plt.xlabel('episodes')  # Label for x-axis
-        plt.ylabel('time')  # Label for y-axis
-        plt.title('timesteps = f(episodes)')  # Title of the plot
-        plt.grid(True)  # Add grid
-        plt.show()  # Show the plot
-        
         # plot cumulative rewards
         plt.figure(2, figsize=(8, 6))  # Set the size of the figure
         plt.plot(range(len(self.cumm_rew)), self.cumm_rew)  # Plot the first function
@@ -349,17 +336,17 @@ class Algorithm():
         plt.title('cumulative reward = f(episodes)')  # Title of the plot
         plt.grid(True)  # Add grid
         plt.show()  # Show the plot
-
+        
         # plot epsilon
         plt.figure(3, figsize=(8, 6))  # Set the size of the figure
-        plt.plot(range(len(self.record_eps)), self.record_eps)  # Plot the first function
+        plt.plot(range(len(self.finish_rt)), self.finish_rt)  # Plot the first function
         plt.xlabel('episodes')  # Label for x-axis
         plt.ylabel('time')  # Label for y-axis
-        plt.title('epsilon = f(episodes)')  # Title of the plot
+        plt.title('time = f(episodes)')  # Title of the plot
         plt.grid(True)  # Add grid
         plt.show()  # Show the plot
-
-        # plot epsilon
+        """
+        # plot alpha
         plt.figure(4, figsize=(8, 6))  # Set the size of the figure
         plt.plot(range(len(self.record_alpha)), self.record_alpha)  # Plot the first function
         plt.xlabel('episodes')  # Label for x-axis
@@ -367,20 +354,16 @@ class Algorithm():
         plt.title('alpha = f(episodes)')  # Title of the plot
         plt.grid(True)  # Add grid
         plt.show()  # Show the plot
+        """
     
 def main(): 
     
     env = DunegeonEnvironment()
-    solver = Algorithm(env, 0.2, 0.2, 0.001, 100, 10, 0.01)
+    solver = Algorithm(env, 0.1, 0.15, 0.001, 100, 10, 0.01)
     traj = solver.dyna_q()
     policy = solver.policy_eval()
     solver.plot_arrow_grid(policy, traj, "graph")
     solver.plot_data()
-    
-    
-    
-       
-    
     
     
 if __name__ == "__main__":

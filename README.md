@@ -258,14 +258,10 @@ Thereafter the new experienced state is set as the current one and an if conditi
 In the end, once the algorithm has performed the required number of episodes, it return th elast trajectory followed, that is then passed to the plotting methods for the display of the related graphs.
 
 ## Hyper-parameter selection:
-
-# Dyna-Q + with prioritized sweeping:
-introduction on what is the dyna Q
-brief explanation of what we now of the environment
-need for modifications due to the stochasticity of the env and its dynamic
-dyna Q+
-make it more efficient prioritized sweeping
-code analysis:
-model data structure
-functions
-parameters choice
+The algorithm shows different parameters with different meaning and tuning requirements, after explaining their meaning the designed parameters obtaining by trail and error will be explained.
+- number of episodes: It is the number of episodes to run the algorithm on, the algorithm can be also applied on continuing infinite task, making this parameter necessary only for testing purposes, a good parameter for testing purposes would be around 2000 episodes.
+- number of siulations: it is the maximum number of simulation step to run, while the priority list is not empty, this parameter together with $\theta$ and sim_k deeply affect the algorithm speed, indeed biger the simulation numbers, slower the algorithm. moreover it also represent the maximum number of state/action values updated once a reward is encountered. For testing purposes it has been set to 10.
+- $\varepsilon$: It is the probability of picking an anction in a not greedy way, in practice it is a metrics of the exploration vs. exploitation trade off for the agent, in detail in the project a value of 0.1 has been choosen.
+- $\alpha$: it is the proportional constant used in the update of the state-action values, tuning the weight of the error correction. In detail bigger it is closer we will move the state-action value to the target. This parameter require a deeper analysis under the assumption of a stochastic environment, indeed an higher $\alpha$ would make the state-action value oscillate a lot over the possible new state/reward combinations obtained for the given state-action couple, on the other hand a too small value would slightly update the state-action value, taking longer to learn the correct one. For testing purposes it has been set to 0.15, in order to deal with the stochasticity of the environment.
+- $\theta$: it is the threshold employed in the priority list, in detail a small value would allow a bigger number of state-action couple to be added to the list, allowing an update of the state-action values more finite for a wider number of state-actions during simulation. Considered the reward encountered during the program execution (-4 < R < 3) and the number of simulation i set a value of 0.001.
+- sim_k: it is the constant used in the bonus reward evaluation, in practice, by its effect on the state-action values, it tunes how fast the algorithm would prefer to try a long untryed state/action couple rather then a couple with a big state-action value update. Considering the maximum number of timesteps choosen and the possible negative reward that can be encountered it has been set to 0.01.
